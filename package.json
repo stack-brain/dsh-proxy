@@ -1,0 +1,42 @@
+{
+  "name": "@stack-brain/dsh-proxy",
+  "description": "DSH plugin (scoped package @stack-brain/dsh-proxy, matching the repository): LAN reverse proxy with native Basic Auth and a settings page. Source lives in this repo's dsh-proxy/ subdirectory; this root package makes the plugin installable from the repository itself (git/github: specs install the root).",
+  "version": "0.2.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "dsh-proxy/lib/index.cjs",
+  "exports": {
+    ".": {
+      "types": "./dsh-proxy/lib/types/index.d.ts",
+      "default": "./dsh-proxy/lib/index.cjs"
+    },
+    "./client": {
+      "types": "./dsh-proxy/lib/types/client/index.d.ts",
+      "default": "./dsh-proxy/lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "dsh-proxy/cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "files": [
+    "dsh-proxy/lib",
+    "dsh-proxy/cordis.patch.yml",
+    "dsh-proxy/dsh.plugin.json",
+    "dsh-proxy/README.md",
+    "dsh-proxy/README.zh.md",
+    "dsh-proxy/LICENSE"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@stack-brain/dsh-proxy",
+  "description": "LAN reverse proxy with web-based auth and a settings page for the DSH web app",
+  "version": "0.2.0",
+  "entry": {
+    "name": "@stack-brain/dsh-proxy",
+    "inject": [
+      "webServer",
+      "connection"
+    ]
+  },
+  "client": {
+    "platform": "web"
+  }
+}

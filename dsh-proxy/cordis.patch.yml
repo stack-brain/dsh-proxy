@@ -1,0 +1,23 @@
+# dsh-proxy bundle patch: mount the host plugin under its package name,
+# resolved through the profile's node_modules. Every knob has a schema default
+# in src/index.ts; override them from the profile's own cordis.patch.yml by
+# targeting this row's id (the patch replaces the whole config, so restate
+# every key you own).
+
+# The plugin serves browsers that cannot see the host display, so the in-app
+# (browse) directory chooser is the right backend: `directory-picker-auto`
+# mounts the native OS dialog while the web app is loopback-bound, and a LAN
+# visitor never sees it.
+#
+# Mounting the browse pair HERE would duplicate a backend the carrier already
+# owns: DSH Desktop injects `desktop-directory-picker-browse-host` (the same
+# `@deepseek-ai/dsh-host-directory-picker-browse` package) whenever it runs on
+# win32, and two rows providing `directoryPicker` abort the boot with
+# `service "directoryPicker" has been registered`. The rows stay under the
+# carrier's ids, so a deployment that pins the chooser does it in its own
+# overlay rather than in this bundle.
+- id: directory-picker
+  disabled: true
+- insert:
+    - id: dsh-proxy
+      name: "@stack-brain/dsh-proxy"

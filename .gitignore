@@ -1,0 +1,16 @@
+# Node 版
+node/node_modules/
+node/dist/
+node/.sea-cache/
+node/config.json
+node/proxy.log
+node/proxy.err
+
+# Go 版
+go/dist/
+go/*.exe
+go/config.json
+
+# CI 临时目录
+release-assets/
+spec/

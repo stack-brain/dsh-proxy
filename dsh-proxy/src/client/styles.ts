@@ -1,0 +1,439 @@
+/**
+ * The settings-section stylesheet, hand-written as a template string and
+ * injected once by the plugin body: the web server serves exactly one file per
+ * client plugin, so no separate CSS artifact may exist. Colors come from the
+ * shared `--dsw-alias-*` design platform, but every reference carries a literal
+ * fallback (the same pattern the harness itself uses) so the section stays
+ * legible even where a token is not defined in the current theme context.
+ * Class names carry the `dsh_lanproxy` prefix to stay unique in the shell.
+ */
+
+/** Stable `<style>` element id (idempotent injection across HMR re-runs). */
+export const STYLE_ID = 'dsh-lanproxy-style'
+
+/** The settings section's injected stylesheet text. */
+export const cssText = `
+.dsh_lanproxy_section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.dsh_lanproxy_heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dsh_lanproxy_title {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.dsh_lanproxy_subtitle {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2, #30363d);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1, #161b22);
+}
+.dsh_lanproxy_cardTitle {
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.dsh_lanproxy_cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.dsh_lanproxy_controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dsh_lanproxy_cardDesc {
+  margin: -4px 0 0;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh_lanproxy_row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.dsh_lanproxy_rowLabel {
+  color: var(--dsw-alias-label-secondary, #c9d1d9);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_rowValue {
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 13px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dsh_lanproxy_portStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dsh_lanproxy_dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.dsh_lanproxy_dotOn {
+  background: var(--dsw-alias-state-success-primary, #3fb950);
+  box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.2);
+}
+.dsh_lanproxy_dotOff {
+  background: var(--dsw-alias-state-error-primary, #f85149);
+  box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.2);
+}
+.dsh_lanproxy_portValue {
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-variant-numeric: tabular-nums;
+}
+.dsh_lanproxy_statusText {
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh_lanproxy_statusTextOn {
+  color: var(--dsw-alias-state-success-primary, #3fb950);
+}
+.dsh_lanproxy_statusTextOff {
+  color: var(--dsw-alias-state-error-primary, #f85149);
+}
+/* Badges: text color only, no tinted background (the user asked for the
+   status text color without the red/green fill). */
+.dsh_lanproxy_badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  background: transparent;
+}
+.dsh_lanproxy_badgeOn {
+  color: var(--dsw-alias-state-success-primary, #3fb950);
+}
+.dsh_lanproxy_badgeOff {
+  color: var(--dsw-alias-state-error-primary, #f85149);
+}
+.dsh_lanproxy_form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.dsh_lanproxy_field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.dsh_lanproxy_fieldLabel {
+  color: var(--dsw-alias-label-secondary, #c9d1d9);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_fieldHint {
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh_lanproxy_input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, #30363d);
+  border-radius: 8px;
+  /* bg-layer-0 does not exist in the design platform; bg-layer-2 is the
+     token the harness itself uses for inputs and raised surfaces. */
+  background: var(--dsw-alias-bg-layer-2, #21262d);
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_input:focus {
+  outline: none;
+  border-color: var(--dsw-alias-accent, #2f81f7);
+}
+.dsh_lanproxy_passwordWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.dsh_lanproxy_passwordInput {
+  padding-right: 36px;
+}
+.dsh_lanproxy_eye {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  cursor: pointer;
+}
+.dsh_lanproxy_eye:hover {
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  background: var(--dsw-alias-bg-layer-2, #21262d);
+}
+.dsh_lanproxy_eye svg {
+  width: 16px;
+  height: 16px;
+}
+.dsh_lanproxy_statusError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.dsh_lanproxy_actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+/* Primary button (启动 / 应用): filled accent with a visible border. */
+.dsh_lanproxy_button {
+  padding: 7px 14px;
+  border: 1px solid var(--dsw-alias-accent, #2f81f7);
+  border-radius: 8px;
+  background: var(--dsw-alias-accent, #2f81f7);
+  color: var(--dsw-alias-fg-on-accent, #ffffff);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.dsh_lanproxy_button:hover:not(:disabled) {
+  background: var(--dsw-alias-accent-hover, #388bfd);
+  border-color: var(--dsw-alias-accent-hover, #388bfd);
+}
+.dsh_lanproxy_button:active:not(:disabled) {
+  background: var(--dsw-alias-accent-active, #1f6feb);
+  border-color: var(--dsw-alias-accent-active, #1f6feb);
+}
+.dsh_lanproxy_button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  border-color: var(--dsw-alias-border-l2, #30363d);
+  background: var(--dsw-alias-bg-layer-2, #21262d);
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+}
+/* Secondary button (停止): outline style with its own border. */
+.dsh_lanproxy_buttonStop {
+  background: var(--dsw-alias-bg-layer-1, #161b22);
+  border: 1px solid var(--dsw-alias-border-l2, #30363d);
+  color: var(--dsw-alias-label-primary, #e6edf3);
+}
+.dsh_lanproxy_buttonStop:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-layer-2, #21262d);
+  border-color: var(--dsw-alias-label-tertiary, #8b949e);
+}
+.dsh_lanproxy_buttonStop:active:not(:disabled) {
+  background: var(--dsw-alias-bg-layer-0, #0d1117);
+}
+.dsh_lanproxy_buttonStop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Session/audit tables in the security card: dense, scrollable, and legible on
+   both themes (cell text uses the theme label, borders the theme border token). */
+.dsh_lanproxy_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  display: block;
+  max-height: 260px;
+  overflow: auto;
+}
+.dsh_lanproxy_table th,
+.dsh_lanproxy_table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, #30363d);
+  text-align: left;
+  white-space: nowrap;
+}
+.dsh_lanproxy_table th {
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-weight: 500;
+}
+.dsh_lanproxy_buttonSmall {
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh_lanproxy_list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 12px;
+  line-height: 18px;
+}
+.dsh_lanproxy_list code {
+  font-family: var(--ds-font-family-code, monospace);
+}
+.dsh_lanproxy_message {
+  margin: 0;
+  color: var(--dsw-alias-state-success-primary, #3fb950);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_error {
+  margin: 0;
+  color: var(--dsw-alias-state-error-primary, #f85149);
+  font-size: 13px;
+  line-height: 20px;
+}
+.dsh_lanproxy_hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-size: 12px;
+  line-height: 18px;
+}
+/* Security notice: the surface is reachable from the network without a
+   password. Distinct from .dsh_lanproxy_error (red, used for real failures) by
+   its warning tint and a soft left rule, so a hard bind failure and a security
+   warning never read as the same thing. */
+.dsh_lanproxy_warn {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--dsw-alias-state-warn-primary, #d29922);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #d29922) 10%, transparent);
+  /* The accent stays in the rule and the tint; the text uses the theme's label
+     so it stays legible on both the amber wash and a light theme. */
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+/* The frame-wide popup (shell.overlay seat). The seat's layer is click-through
+   and every child opts back into pointer events, so this card is the only thing
+   that captures the mouse — the app underneath stays fully usable, which is why
+   the notice is a card rather than a blocking modal dialog. Top-center keeps it
+   clear of the sidebar and the conversation composer, and it owns no backdrop,
+   so it reads as an alert that waits instead of a wall. */
+.dsh_lanproxy_notice {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  width: min(460px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-state-error-primary, #f85149);
+  border-radius: 12px;
+  /* A hint of the error tint keeps the card alarming in a LIGHT theme too,
+     where the border alone would read as an ordinary card. */
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #f85149) 8%, var(--dsw-alias-bg-layer-2, #161b22));
+  box-shadow: var(--dsw-elevation-prominent, 0 8px 24px rgb(0 0 0 / 45%));
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  transform: translateX(-50%);
+  animation: dsh_lanproxy_noticeIn 160ms ease-out;
+}
+@keyframes dsh_lanproxy_noticeIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsh_lanproxy_notice { animation: none; }
+}
+.dsh_lanproxy_noticeTitle {
+  margin: 0;
+  /* The red lives in the card border and the body text: a red TITLE (this used
+     to be error-colored) is the classic light-theme legibility trap. */
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.dsh_lanproxy_noticeBody {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.dsh_lanproxy_noticeHint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #c9d1d9);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.dsh_lanproxy_noticeButton {
+  align-self: flex-end;
+  padding: 4px 14px;
+  border: 1px solid var(--dsw-alias-accent, #2f81f7);
+  border-radius: 8px;
+  /* Same pair as the settings page's primary button: an accent FILL with the
+     foreground token that belongs on it. The first cut used the theme's
+     label-primary token over a hand-picked dark background, and since that
+     label resolves to BLACK in the light theme the result was black-on-black. */
+  background: var(--dsw-alias-accent, #2f81f7);
+  color: var(--dsw-alias-fg-on-accent, #ffffff);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.dsh_lanproxy_noticeButton:hover {
+  background: var(--dsw-alias-accent-hover, #388bfd);
+  border-color: var(--dsw-alias-accent-hover, #388bfd);
+}
+.dsh_lanproxy_noticeButton:active {
+  background: var(--dsw-alias-accent-active, #1f6feb);
+  border-color: var(--dsw-alias-accent-active, #1f6feb);
+}
+.dsh_lanproxy_noticeButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-error-primary, #f85149);
+  outline-offset: 2px;
+}
+`
+
+/** Inject the stylesheet once (idempotent). */
+export function adoptStyles(): void {
+  if (document.getElementById(STYLE_ID) !== null) return
+  const style = document.createElement('style')
+  style.id = STYLE_ID
+  style.textContent = cssText
+  document.head.appendChild(style)
+}
