@@ -1,7 +1,7 @@
 /**
  * Persisted security knobs that are NOT the credential pair.
  *
- * Kept in their own file rather than folded into `dsh-proxy.json`: that file is
+ * Kept in their own file rather than folded into `dsh-proxy.yaml`: that file is
  * the runtime overlay for the forwarding service (port, credentials), while
  * these decide HOW the gate behaves. Mixing them would make a settings write
  * about a port also rewrite the transport policy.
@@ -19,8 +19,7 @@
  * Note the asymmetry the caller must surface: on cleartext the session cookie
  * cannot carry `Secure`, so it is a weaker cookie — see the note in `auth.ts`.
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readStateYaml, writeStateYaml } from './state-file.ts'
 
 /** How a plain-HTTP (non-loopback) visitor authenticates. */
 export type CleartextAuthMode = 'login' | 'basic'
@@ -45,7 +44,7 @@ export function isCleartextAuthMode(value: unknown): value is CleartextAuthMode 
   return value === 'login' || value === 'basic'
 }
 
-/** Tolerant read of an unknown JSON value into the settings shape. */
+/** Tolerant read of an unknown YAML/JSON value into the settings shape. */
 export function normalizeSecuritySettings(raw: unknown): SecuritySettings {
   if (typeof raw !== 'object' || raw === null) return { ...DEFAULT_SECURITY_SETTINGS }
   const source = raw as Record<string, unknown>
@@ -67,23 +66,10 @@ export class SecuritySettingsFile {
   constructor(private readonly filePath: string) {}
 
   read(): SecuritySettings {
-    let text: string
-    try {
-      text = readFileSync(this.filePath, 'utf8')
-    } catch {
-      return { ...DEFAULT_SECURITY_SETTINGS }
-    }
-    try {
-      return normalizeSecuritySettings(JSON.parse(text))
-    } catch {
-      return { ...DEFAULT_SECURITY_SETTINGS }
-    }
+    return readStateYaml(this.filePath, normalizeSecuritySettings, () => ({ ...DEFAULT_SECURITY_SETTINGS }))
   }
 
   write(settings: SecuritySettings): void {
-    mkdirSync(dirname(this.filePath), { recursive: true })
-    const temp = `${this.filePath}.tmp`
-    writeFileSync(temp, `${JSON.stringify(settings, null, 2)}\n`, 'utf8')
-    renameSync(temp, this.filePath)
+    writeStateYaml(this.filePath, settings)
   }
 }

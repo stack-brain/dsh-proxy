@@ -42,7 +42,7 @@ export interface AuditEntry {
     /** When it happened (ms epoch). */
     at: number;
     /** What happened. */
-    event: 'login' | 'login-failed' | 'login-throttled' | 'login-origin-withheld' | 'logout' | 'logout-all' | 'session-revoked' | 'locked-out' | 'insecure-transport-refused';
+    event: 'login' | 'login-failed' | 'login-throttled' | 'login-origin-withheld' | 'logout' | 'logout-all' | 'session-revoked' | 'locked-out' | 'insecure-transport-refused' | 'oauth-login' | 'oauth-login-failed' | 'oauth-login-unbound' | 'oauth-unavailable' | 'oauth-state-invalid' | 'oauth-access-denied' | 'oauth-binding-added' | 'oauth-binding-removed' | 'oauth-binding-rejected';
     /** Source key the event is attributed to (remote address). */
     source: string;
     /** Optional human-readable detail (never a credential). */
@@ -121,6 +121,17 @@ export declare class AuthState {
         reason: 'locked' | 'invalid' | 'disabled';
         retryAfterMs: number;
     };
+    /**
+     * Issue a session for an ALREADY AUTHORIZED external sign-in.
+     *
+     * The caller (OAuthRuntime) has verified the one-shot state and the manual
+     * binding before this runs, so there is no credential to compare; the session
+     * shape, TTL, idle sweep and revocation stay identical to a password login.
+     */
+    issueExternalSession(input: {
+        source: string;
+        userAgent?: string;
+    }): AuthSession;
     /**
      * Validate a session cookie and refresh its idle timer.
      * @param token - the cookie value, when present.

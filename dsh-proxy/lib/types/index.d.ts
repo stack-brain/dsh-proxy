@@ -17,6 +17,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { ProxyController } from './controller.ts';
+import { type OAuthConfig } from './oauth/providers.ts';
 import { type StateScope } from './state-dir.ts';
 export { lanAddresses, startLanProxy } from './proxy.ts';
 export type { LanProxyHandle, LanProxyOptions } from './proxy.ts';
@@ -57,6 +58,8 @@ export interface Config {
      * shared file set directly in `$DSH_HOME`.
      */
     stateScope: StateScope;
+    /** Third-party login config; official endpoints apply unless overridden. */
+    oauth?: OAuthConfig;
 }
 /** Configuration schema; deployment-varying bounds stay tunable from cordis.yml. */
 export declare const Config: z<Schemastery.ObjectS<{
@@ -69,6 +72,7 @@ export declare const Config: z<Schemastery.ObjectS<{
     trustedProxies: z<string[], string[]>;
     requireTls: z<boolean, boolean>;
     stateScope: z<"profile" | "home", "profile" | "home">;
+    oauth: z<OAuthConfig, OAuthConfig>;
 }>, Schemastery.ObjectT<{
     listenHost: z<string, string>;
     listenPort: z<number, number>;
@@ -79,6 +83,7 @@ export declare const Config: z<Schemastery.ObjectS<{
     trustedProxies: z<string[], string[]>;
     requireTls: z<boolean, boolean>;
     stateScope: z<"profile" | "home", "profile" | "home">;
+    oauth: z<OAuthConfig, OAuthConfig>;
 }>>;
 /**
  * Build the handler mounted at {@link LAN_PROXY_PATH} on Connection's shared

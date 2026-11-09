@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net'
 import http from 'node:http'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ProxyController, type EffectiveProxyOptions } from '../src/controller.ts'
+import { parseStateYaml } from '../src/state-file.ts'
 
 const dirs: string[] = []
 const servers: http.Server[] = []
@@ -14,7 +15,7 @@ const logs: string[] = []
 function tempSettingsFile(): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-proxy-controller-'))
   dirs.push(dir)
-  return join(dir, 'dsh-proxy.json')
+  return join(dir, 'dsh-proxy.yaml')
 }
 
 /** An upstream that answers every path with its marker text. */
@@ -327,7 +328,7 @@ describe('ProxyController update', () => {
     expect(out.result.status.proxyListening).toBe(false)
     expect(out.result.message).toContain('无法监听')
     // The save itself still landed on disk.
-    const persisted = JSON.parse(readFileSync(settingsFile, 'utf8'))
+    const persisted = parseStateYaml(readFileSync(settingsFile, 'utf8')) as { listenPort: number }
     expect(persisted.listenPort).toBe(takenPort)
   })
 
@@ -358,7 +359,7 @@ describe('ProxyController update', () => {
     expect(out.result.status.username).toBe('alice')
     expect(out.result.message).toBe('已保存')
     // The save still persisted.
-    const persisted = JSON.parse(readFileSync(settingsFile, 'utf8'))
+    const persisted = parseStateYaml(readFileSync(settingsFile, 'utf8')) as { username: string }
     expect(persisted.username).toBe('alice')
   })
 })

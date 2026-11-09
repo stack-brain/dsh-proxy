@@ -26,6 +26,9 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { ProxyController } from './controller.ts'
 import { SESSION_COOKIE, readCookie } from './auth.ts'
+import { normalizeOAuthConfig } from './oauth/config.ts'
+import { requestOriginOf } from './oauth/origin.ts'
+import { defaultOAuthConfig, type OAuthConfig } from './oauth/providers.ts'
 import {
   PROXY_STATE_FILES,
   type StateScope,
@@ -36,6 +39,10 @@ import {
   ENDPOINT_AUDIT,
   ENDPOINT_AUTH,
   ENDPOINT_AUTH_REVOKE,
+  ENDPOINT_OAUTH_BINDING_REMOVE,
+  ENDPOINT_OAUTH_BINDING_START,
+  ENDPOINT_OAUTH_STATUS,
+  ENDPOINT_OAUTH_UPDATE,
   ENDPOINT_SECURITY,
   ENDPOINT_START,
   ENDPOINT_STATUS,
@@ -91,7 +98,17 @@ export interface Config {
    * shared file set directly in `$DSH_HOME`.
    */
   stateScope: StateScope
+  /** Third-party login config; official endpoints apply unless overridden. */
+  oauth?: OAuthConfig
 }
+
+/**
+ * The OAuth subtree is normalized by `normalizeOAuthConfig` (tolerant of any
+ * deployment YAML, fills every default), so the schemastery node only needs to
+ * carry a complete default value. `z.any` also keeps declaration emit from
+ * referencing cosmokit's internal `Dict` through deeply nested object schemas.
+ */
+const emptyOAuthConfig = (): OAuthConfig => defaultOAuthConfig()
 
 /** Configuration schema; deployment-varying bounds stay tunable from cordis.yml. */
 export const Config = z.object({
@@ -104,6 +121,7 @@ export const Config = z.object({
   trustedProxies: z.array(z.string()).default([]),
   requireTls: z.boolean().default(false),
   stateScope: z.union([z.const('profile'), z.const('home')]).default('profile'),
+  oauth: z.any<OAuthConfig>().default(emptyOAuthConfig()),
 })
 
 /** One endpoint failure in the shared result envelope. */
@@ -139,6 +157,8 @@ export function createLanProxyRoute(
     endpoint: string,
     payload: unknown,
     currentToken: string | undefined,
+    /** Origin the settings page used for this RPC; drives dynamic callback hints. */
+    requestOrigin?: string,
   ): Promise<LanProxyResult<unknown>> => {
     if (endpoint === ENDPOINT_STATUS) {
       return { ok: true, value: await controller.refreshStatus() }
@@ -177,6 +197,22 @@ export function createLanProxyRoute(
       if (outcome.ok) return { ok: true, value: outcome }
       return failure(outcome.message)
     }
+    if (endpoint === ENDPOINT_OAUTH_STATUS) {
+      const view = controller.oauthStatus(requestOrigin)
+      return view === null ? failure('第三方登录未初始化') : { ok: true, value: view }
+    }
+    if (endpoint === ENDPOINT_OAUTH_UPDATE) {
+      const outcome = controller.updateOAuth(payload, requestOrigin)
+      return outcome.ok ? { ok: true, value: outcome.view } : failure(outcome.message)
+    }
+    if (endpoint === ENDPOINT_OAUTH_BINDING_START) {
+      const outcome = controller.startOAuthBinding(payload, requestOrigin)
+      return outcome.ok ? { ok: true, value: { startUrl: outcome.startUrl } } : failure(outcome.message)
+    }
+    if (endpoint === ENDPOINT_OAUTH_BINDING_REMOVE) {
+      const outcome = controller.removeOAuthBinding(payload, requestOrigin)
+      return outcome.ok ? { ok: true, value: outcome.view } : failure(outcome.message)
+    }
     return failure(`unknown endpoint ${JSON.stringify(endpoint)}`)
   }
 
@@ -190,10 +226,20 @@ export function createLanProxyRoute(
     if (typeof body?.endpoint !== 'string' || body.endpoint.length === 0) {
       return Response.json(failure('body has no endpoint'), { status: 400 })
     }
+    // Derive the caller's origin server-side from the browser's own Origin /
+    // Referer headers, so displayed callback URIs follow the current page
+    // without a hardcoded host or a spoofable client-supplied hint.
+    const requestOrigin = requestOriginOf({
+      url: request.url,
+      originHeader: request.headers.get('origin'),
+      referer: request.headers.get('referer'),
+      host: request.headers.get('host'),
+    })
     const result = await dispatch(
       body.endpoint,
       body.payload,
       currentSessionToken === undefined ? undefined : currentSessionToken(request),
+      requestOrigin,
     )
     return Response.json(result)
   }
@@ -240,6 +286,8 @@ export function apply(ctx: Context, config?: Config): void {
     settingsFile: join(state.dir, PROXY_STATE_FILES.settings),
     auditFile: join(state.dir, PROXY_STATE_FILES.audit),
     securityFile: join(state.dir, PROXY_STATE_FILES.security),
+    oauthBase: normalizeOAuthConfig(resolved.oauth, defaultOAuthConfig()),
+    oauthFile: join(state.dir, PROXY_STATE_FILES.oauth),
     trustedProxyAddresses: resolved.trustedProxies,
     requireTls: resolved.requireTls,
     loginTitle: 'DSH 局域网代理',

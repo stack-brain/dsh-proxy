@@ -9,7 +9,7 @@ Supports Basic Auth, LAN access, and `crypto.randomUUID` polyfill injection.
 
 **Recommended for DSH (DeepSeek Harness) users**: install the proxy as a plugin into the web profile — it **starts and stops with `dsh web`**, no separate process or downloadable binary needed, with a full settings page.
 
-- Same native **Basic Auth** (browser dialog) and full HTTP + WebSocket forwarding as the standalone builds
+- Full HTTP + WebSocket forwarding; a **self-contained login page + sessions** by default, optional **third-party sign-in** (GitHub / Google / Feishu / Casdoor), and the browser's native **Basic Auth** dialog as an alternative
 - **Settings page** (DSH settings → LAN Proxy): status lights, start/stop, edit the proxy listen port, username, and password (form pre-fills current values; empty means set blank)
 - Empty credentials by default = password login off; password login turns on only when **both** username and password are set
 
@@ -31,7 +31,7 @@ dsh plugin --profile web add github:stack-brain/dsh-proxy#master
 dsh plugin --profile web add file:C:/mydata/codes/dsh-proxy
 ```
 
-After restarting `dsh web`, visit `http://<your-LAN-IP>:3081` and the browser shows the native Basic Auth dialog.
+After restarting `dsh web`, visit `http://<your-LAN-IP>:3081` and you get the login page; enable third-party channels in the settings page to sign in with them (the native Basic Auth dialog appears only with `cleartextAuth: 'basic'`).
 Details: [`dsh-proxy/README.md`](dsh-proxy/README.md).
 
 ## Standalone executables (go/ and node/)

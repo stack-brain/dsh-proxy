@@ -1,11 +1,19 @@
-/** The three on-disk state files, named once so every caller agrees. */
+/** The on-disk state files, named once so every caller agrees. */
 export declare const PROXY_STATE_FILES: {
     /** Runtime overlay: listen port, username, password. */
-    readonly settings: "dsh-proxy.json";
-    /** Append-only login audit trail. */
+    readonly settings: "dsh-proxy.yaml";
+    /** Append-only login audit trail (JSON Lines, intentionally not a config). */
     readonly audit: "dsh-proxy-audit.jsonl";
     /** Transport policy: requireTls / cleartextAuth. */
+    readonly security: "dsh-proxy-security.yaml";
+    /** Third-party login config overlay + manual binding table. */
+    readonly oauth: "dsh-proxy-oauth.yaml";
+};
+/** Pre-YAML config file names, kept only for the one-time migration. */
+export declare const LEGACY_JSON_STATE_FILES: {
+    readonly settings: "dsh-proxy.json";
     readonly security: "dsh-proxy-security.json";
+    readonly oauth: "dsh-proxy-oauth.json";
 };
 /** Subdirectory inside the profile root, keeping state away from cordis files. */
 export declare const PROXY_STATE_DIR_NAME = "dsh-proxy";
@@ -20,7 +28,7 @@ export interface ResolveStateDirOptions {
     scope: StateScope;
 }
 export interface StateDirResolution {
-    /** Directory the three state files live in. */
+    /** Directory the state files live in. */
     dir: string;
     /** Scope actually in effect (`home` when a fallback happened). */
     scope: StateScope;
@@ -50,10 +58,12 @@ export declare function resolveStateDir(options: ResolveStateDirOptions): StateD
  * One-time migration: copy the legacy home-root state files into a profile's
  * private directory so an upgrade does not lose the saved port or credentials.
  *
- * The copy happens only while the private directory has NONE of the three
- * files; as soon as the settings page writes one, that profile is on its own
- * and the shared files are never read again. The legacy files are left in
- * place as a rollback path, and a read-only/unwritable home is not an error.
+ * Legacy JSON configs are converted to their YAML successors on the way; the
+ * append-only audit trail is copied byte-for-byte. The migration happens only
+ * while the private directory has NONE of the four files; as soon as the
+ * settings page writes one, that profile is on its own and the shared files are
+ * never read again. The legacy files are left in place as a rollback path, and
+ * a read-only/unwritable home is not an error.
  *
  * @param dir - private state directory (as returned by {@link resolveStateDir}).
  * @param dshHome - resolved harness home holding the legacy files.

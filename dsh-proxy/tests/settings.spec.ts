@@ -3,13 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { RuntimeSettingsFile, normalizeRuntimeSettings, validateUpdate } from '../src/settings.ts'
+import { parseStateYaml } from '../src/state-file.ts'
 
 const dirs: string[] = []
 
 function tempFile(): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-proxy-settings-'))
   dirs.push(dir)
-  return join(dir, 'dsh-proxy.json')
+  return join(dir, 'dsh-proxy.yaml')
 }
 
 afterEach(() => {
@@ -43,7 +44,10 @@ describe('RuntimeSettingsFile', () => {
     const store = new RuntimeSettingsFile(file)
     expect(store.read()).toEqual({})
     store.write({ upstreamPort: 9090, username: 'alice', password: 'pw' })
-    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ upstreamPort: 9090, username: 'alice', password: 'pw' })
+    const text = readFileSync(file, 'utf8')
+    expect(text).toContain('username: alice')
+    expect(text).not.toContain('"username"')
+    expect(parseStateYaml(text)).toEqual({ upstreamPort: 9090, username: 'alice', password: 'pw' })
     expect(store.read()).toEqual({ upstreamPort: 9090, username: 'alice', password: 'pw' })
   })
 

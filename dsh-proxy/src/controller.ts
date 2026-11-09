@@ -19,10 +19,15 @@ import {
 } from './security.ts'
 import { LOGIN_PATH, LOGOUT_PATH } from './proxy.ts'
 import { isLoopbackAddress } from './netaccess.ts'
+import { OAuthRuntime, type OAuthViewResult } from './oauth/runtime.ts'
+import { resolveOAuthOrigin } from './oauth/origin.ts'
+import { OAuthStateFile } from './oauth/config.ts'
+import { defaultOAuthConfig, type OAuthConfig } from './oauth/providers.ts'
 import {
   isLanExposed,
   type LanProxyAuditView,
   type LanProxyAuthView,
+  type LanProxyOAuthView,
   type LanProxySecurityPayload,
   type LanProxyStatus,
   type LanProxyUpdatePayload,
@@ -63,6 +68,10 @@ export interface ProxyControllerOptions {
   requireTls?: boolean
   /** Path of the persisted transport policy (`requireTls`), so the switch survives a restart. */
   securityFile?: string
+  /** Resolved cordis `oauth` config (schema defaults applied). */
+  oauthBase?: OAuthConfig
+  /** Path of the profile-private OAuth overlay + binding table. */
+  oauthFile?: string
   /** Login page title/heading. */
   loginTitle?: string
   /** Log sink (the plugin passes ctx.logger-based printer). */
@@ -98,6 +107,8 @@ export class ProxyController {
   private readonly security: SecuritySettingsFile | null
   /** Effective transport policy, kept in sync with the file. */
   private securitySettings: SecuritySettings
+  /** Third-party login runtime; null only when no state file was wired in. */
+  private readonly oauth: OAuthRuntime | null
 
   constructor(private readonly opts: ProxyControllerOptions) {
     this.log = opts.log
@@ -110,6 +121,19 @@ export class ProxyController {
       audit: (entry) => this.audit?.record(entry),
     })
     this.options = { ...opts.base }
+    this.oauth = opts.oauthFile === undefined
+      ? null
+      : new OAuthRuntime({
+        base: opts.oauthBase ?? defaultOAuthConfig(),
+        stateFile: new OAuthStateFile(opts.oauthFile),
+        auth: this.auth,
+        getLocalSubject: () => this.options.username === '' ? 'default' : this.options.username,
+        hasPassword: () => this.hasPassword(),
+        cleartextAuth: () => this.cleartextAuth(),
+        publicOrigin: (requestOrigin?: string) => this.publicOrigin(requestOrigin),
+        audit: (entry) => this.audit?.record(entry),
+        log: this.log,
+      })
     const persisted = this.settings.read()
     if (persisted.listenPort !== undefined) this.options.listenPort = persisted.listenPort
     if (persisted.upstreamPort !== undefined) this.options.upstreamPort = persisted.upstreamPort
@@ -143,6 +167,7 @@ export class ProxyController {
       username: this.options.username,
       password: this.options.password,
       auth: this.auth,
+      ...(this.oauth === null ? {} : { oauth: this.oauth }),
       ...(this.opts.trustedProxyAddresses === undefined ? {} : { trustedProxyAddresses: this.opts.trustedProxyAddresses }),
       requireTls: this.requireTls(),
       cleartextAuth: this.cleartextAuth(),
@@ -159,8 +184,10 @@ export class ProxyController {
       log('info', `dsh-proxy: listening on ${this.options.listenHost}:${bound} -> http://${this.options.upstreamHost}:${this.options.upstreamPort}`)
       log('info', `dsh-proxy: 本机访问 ${urls.local}`)
       for (const url of urls.lan) log('info', `dsh-proxy: 局域网访问 ${url}`)
-      if (this.options.username !== '' && this.options.password !== '') {
-        log('info', `dsh-proxy: password login enabled (username: ${this.options.username})`)
+      if (this.authEnabled()) {
+        log('info', this.hasPassword()
+          ? `dsh-proxy: password login enabled (username: ${this.options.username})`
+          : 'dsh-proxy: third-party login enabled (no local password configured)')
         if (!this.requireTls() && this.cleartextAuth() === 'login' && !isLoopbackAddress(this.options.listenHost)) {
           // Be explicit about the weaker cookie rather than letting an operator
           // assume cleartext sessions are equivalent to TLS ones.
@@ -214,7 +241,8 @@ export class ProxyController {
       policy: this.auth.authPolicy,
       requireTls: this.requireTls(),
       cleartextAuth: this.cleartextAuth(),
-      loginEnabled: this.options.username !== '' && this.options.password !== '',
+      loginEnabled: this.hasPassword(),
+      oauthEnabled: this.oauth?.authEnabled ?? false,
       loginPath: LOGIN_PATH,
       logoutPath: LOGOUT_PATH,
     }
@@ -320,8 +348,9 @@ export class ProxyController {
    * reflects the most recent probe (false until the first probe runs).
    */
   status(): LanProxyStatus {
-    const authEnabled = this.options.username !== '' && this.options.password !== ''
+    const authEnabled = this.authEnabled()
     return {
+      oauthEnabled: this.oauth?.authEnabled ?? false,
       listenHost: this.options.listenHost,
       listenPort: this.boundPort ?? this.options.listenPort,
       proxyListening: this.boundPort !== null,
@@ -437,5 +466,62 @@ export class ProxyController {
           : (partial ? '已保存并重启转发服务（注意：需同时设置用户名和密码才会启用密码登录）' : '已保存并重启转发服务'),
       },
     }
+  }
+
+  /** Whether the local username/password pair is complete. */
+  private hasPassword(): boolean {
+    return this.options.username !== '' && this.options.password !== ''
+  }
+
+  /**
+   * D2: either configured authentication method turns the gate on. With
+   * NEITHER method configured the long-standing open/warning posture stays
+   * unchanged (D2′, see the spec).
+   */
+  private authEnabled(): boolean {
+    if (this.oauth === null) return this.hasPassword()
+    return this.oauth.authEnabled
+  }
+
+  /**
+   * Externally reachable proxy origin for the settings page's displayed
+   * callback URIs and binding links.
+   *
+   * Precedence: explicit `publicOrigin` override > the domain actually used by
+   * the settings page (with the proxy's real port substituted when the settings
+   * page runs on the DSH app's own port) > the legacy LAN-IP guess. The live
+   * login flow never uses this: it builds `redirect_uri` from `gate.origin`.
+   */
+  private publicOrigin(requestOrigin?: string): string {
+    const port = this.boundPort ?? this.options.listenPort
+    return resolveOAuthOrigin({
+      configured: this.oauth?.effective.publicOrigin,
+      requestOrigin,
+      listenPort: port,
+      inferred: lanAddresses(port)[0] ?? `http://127.0.0.1:${port}`,
+    }).origin
+  }
+
+  /** Settings view of the third-party login surface; null when not wired in. */
+  oauthStatus(requestOrigin?: string): LanProxyOAuthView | null {
+    return this.oauth?.statusView(requestOrigin) ?? null
+  }
+
+  /** Validate + persist an OAuth config patch (effective on the next request). */
+  updateOAuth(payload: unknown, requestOrigin?: string): OAuthViewResult {
+    if (this.oauth === null) return { ok: false, message: '第三方登录未初始化' }
+    return this.oauth.updateConfig(payload, requestOrigin)
+  }
+
+  /** Start a manual binding flow from the settings page. */
+  startOAuthBinding(payload: unknown, requestOrigin?: string): { ok: true; startUrl: string } | { ok: false; message: string } {
+    if (this.oauth === null) return { ok: false, message: '第三方登录未初始化' }
+    return this.oauth.startBinding(payload, requestOrigin)
+  }
+
+  /** Remove one manual binding; the account loses access immediately. */
+  removeOAuthBinding(payload: unknown, requestOrigin?: string): OAuthViewResult {
+    if (this.oauth === null) return { ok: false, message: '第三方登录未初始化' }
+    return this.oauth.removeBindingById(payload, requestOrigin)
   }
 }

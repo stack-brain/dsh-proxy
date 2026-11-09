@@ -11,7 +11,7 @@ export interface SecuritySettings {
 export declare const DEFAULT_SECURITY_SETTINGS: SecuritySettings;
 /** Whether a value is an accepted cleartext mode. */
 export declare function isCleartextAuthMode(value: unknown): value is CleartextAuthMode;
-/** Tolerant read of an unknown JSON value into the settings shape. */
+/** Tolerant read of an unknown YAML/JSON value into the settings shape. */
 export declare function normalizeSecuritySettings(raw: unknown): SecuritySettings;
 /**
  * Read/write access to the persisted security settings. Writes are atomic

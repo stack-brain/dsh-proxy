@@ -4,12 +4,14 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  LEGACY_JSON_STATE_FILES,
   PROXY_STATE_DIR_NAME,
   PROXY_STATE_FILES,
   profileDirFromBaseUrl,
   resolveStateDir,
   seedLegacyState,
 } from '../src/state-dir.ts'
+import { parseStateYaml } from '../src/state-file.ts'
 import { RuntimeSettingsFile } from '../src/settings.ts'
 
 const dirs: string[] = []
@@ -93,31 +95,55 @@ describe('resolveStateDir', () => {
 })
 
 describe('seedLegacyState', () => {
-  it('copies the legacy files once into a private directory', () => {
+  it('copies existing YAML files once into a private directory', () => {
     const home = tempHome()
     const settings = { username: 'legacy-user', password: 'legacy-pass' }
-    writeFileSync(join(home, PROXY_STATE_FILES.settings), JSON.stringify(settings))
-    writeFileSync(join(home, PROXY_STATE_FILES.security), '{"requireTls":true}')
+    writeFileSync(join(home, PROXY_STATE_FILES.settings), 'username: legacy-user\npassword: legacy-pass\n')
+    writeFileSync(join(home, PROXY_STATE_FILES.security), 'requireTls: true\n')
 
     const dir = join(home, 'profiles', 'web', PROXY_STATE_DIR_NAME)
     expect(seedLegacyState(dir, home)).toEqual([
       PROXY_STATE_FILES.settings,
       PROXY_STATE_FILES.security,
     ])
-    expect(JSON.parse(readFileSync(join(dir, PROXY_STATE_FILES.settings), 'utf8'))).toEqual(settings)
-    expect(readFileSync(join(dir, PROXY_STATE_FILES.security), 'utf8')).toBe('{"requireTls":true}')
+    expect(parseStateYaml(readFileSync(join(dir, PROXY_STATE_FILES.settings), 'utf8'))).toEqual(settings)
+    expect(parseStateYaml(readFileSync(join(dir, PROXY_STATE_FILES.security), 'utf8'))).toEqual({ requireTls: true })
     // The legacy files stay in place as a rollback path.
     expect(existsSync(join(home, PROXY_STATE_FILES.settings))).toBe(true)
     // A second call is a no-op: never overwrite the profile's own state.
     expect(seedLegacyState(dir, home)).toEqual([])
   })
 
+  it('converts legacy JSON configs into readable YAML during migration', () => {
+    const home = tempHome()
+    const settings = { username: 'old-user', password: 'old-pass' }
+    writeFileSync(join(home, LEGACY_JSON_STATE_FILES.settings), JSON.stringify(settings))
+    writeFileSync(join(home, LEGACY_JSON_STATE_FILES.security), '{"requireTls":true}')
+    writeFileSync(join(home, PROXY_STATE_FILES.audit), '{"event":"login"}\n')
+
+    const dir = join(home, 'profiles', 'web', PROXY_STATE_DIR_NAME)
+    const copied = seedLegacyState(dir, home)
+    expect(copied).toContain(`${LEGACY_JSON_STATE_FILES.settings} -> ${PROXY_STATE_FILES.settings}`)
+    expect(copied).toContain(PROXY_STATE_FILES.audit)
+
+    // The private copies are YAML, not JSON, and hold exactly the same data.
+    const text = readFileSync(join(dir, PROXY_STATE_FILES.settings), 'utf8')
+    expect(text).toContain('username: old-user')
+    expect(text).not.toContain('"username"')
+    expect(parseStateYaml(text)).toEqual(settings)
+    expect(parseStateYaml(readFileSync(join(dir, PROXY_STATE_FILES.security), 'utf8'))).toEqual({ requireTls: true })
+    // The append-only audit trail is copied byte-for-byte (still JSON Lines).
+    expect(readFileSync(join(dir, PROXY_STATE_FILES.audit), 'utf8')).toBe('{"event":"login"}\n')
+    // Legacy files are never removed.
+    expect(existsSync(join(home, LEGACY_JSON_STATE_FILES.settings))).toBe(true)
+  })
+
   it('does not seed when any private file already exists', () => {
     const home = tempHome()
-    writeFileSync(join(home, PROXY_STATE_FILES.settings), '{"username":"legacy"}')
+    writeFileSync(join(home, LEGACY_JSON_STATE_FILES.settings), '{"username":"legacy"}')
     const dir = join(home, 'profiles', 'web', PROXY_STATE_DIR_NAME)
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, PROXY_STATE_FILES.security), '{"requireTls":false}')
+    writeFileSync(join(dir, PROXY_STATE_FILES.security), 'requireTls: false\n')
 
     expect(seedLegacyState(dir, home)).toEqual([])
     expect(existsSync(join(dir, PROXY_STATE_FILES.settings))).toBe(false)
@@ -134,7 +160,7 @@ describe('per-profile isolation', () => {
   it('writes to one profile without touching the other or the legacy root', () => {
     const home = tempHome()
     const legacy = { listenPort: 3081, username: 'shared', password: 'shared' }
-    writeFileSync(join(home, PROXY_STATE_FILES.settings), JSON.stringify(legacy))
+    writeFileSync(join(home, LEGACY_JSON_STATE_FILES.settings), JSON.stringify(legacy))
 
     const stateFor = (name: string) => resolveStateDir({
       baseUrl: profileBaseUrl(home, name),
@@ -149,12 +175,12 @@ describe('per-profile isolation', () => {
 
     const webFile = new RuntimeSettingsFile(join(webDir, PROXY_STATE_FILES.settings))
     const desktopFile = new RuntimeSettingsFile(join(desktopDir, PROXY_STATE_FILES.settings))
-    expect(webFile.read().username).toBe('shared')
-    expect(desktopFile.read().username).toBe('shared')
+    expect(webFile.read()).toEqual(legacy)
+    expect(desktopFile.read()).toEqual(legacy)
 
     webFile.write({ listenPort: 3091, username: 'web-only', password: 'web-pass' })
     expect(desktopFile.read()).toEqual(legacy)
-    expect(JSON.parse(readFileSync(join(home, PROXY_STATE_FILES.settings), 'utf8'))).toEqual(legacy)
+    expect(parseStateYaml(readFileSync(join(home, LEGACY_JSON_STATE_FILES.settings), 'utf8'))).toEqual(legacy)
 
     desktopFile.write({ listenPort: 3092, username: 'desktop-only', password: 'desktop-pass' })
     expect(webFile.read().username).toBe('web-only')

@@ -1,6 +1,8 @@
 import { type AuthPolicy } from './auth.ts';
 import { type CleartextAuthMode } from './security.ts';
-import { type LanProxyAuditView, type LanProxyAuthView, type LanProxyStatus, type LanProxyUpdateResult } from './contract.ts';
+import { type OAuthViewResult } from './oauth/runtime.ts';
+import { type OAuthConfig } from './oauth/providers.ts';
+import { type LanProxyAuditView, type LanProxyAuthView, type LanProxyOAuthView, type LanProxyStatus, type LanProxyUpdateResult } from './contract.ts';
 /** The fully-resolved runtime options of one proxy instance. */
 export interface EffectiveProxyOptions {
     listenHost: string;
@@ -34,6 +36,10 @@ export interface ProxyControllerOptions {
     requireTls?: boolean;
     /** Path of the persisted transport policy (`requireTls`), so the switch survives a restart. */
     securityFile?: string;
+    /** Resolved cordis `oauth` config (schema defaults applied). */
+    oauthBase?: OAuthConfig;
+    /** Path of the profile-private OAuth overlay + binding table. */
+    oauthFile?: string;
     /** Login page title/heading. */
     loginTitle?: string;
     /** Log sink (the plugin passes ctx.logger-based printer). */
@@ -69,6 +75,8 @@ export declare class ProxyController {
     private readonly security;
     /** Effective transport policy, kept in sync with the file. */
     private securitySettings;
+    /** Third-party login runtime; null only when no state file was wired in. */
+    private readonly oauth;
     constructor(opts: ProxyControllerOptions);
     /** Whether a persisted runtime override exists (drives the status flag). */
     private persisted;
@@ -149,4 +157,36 @@ export declare class ProxyController {
      * @returns the new status, or a user-facing rejection message.
      */
     update(payload: unknown): Promise<UpdateOutcome>;
+    /** Whether the local username/password pair is complete. */
+    private hasPassword;
+    /**
+     * D2: either configured authentication method turns the gate on. With
+     * NEITHER method configured the long-standing open/warning posture stays
+     * unchanged (D2′, see the spec).
+     */
+    private authEnabled;
+    /**
+     * Externally reachable proxy origin for the settings page's displayed
+     * callback URIs and binding links.
+     *
+     * Precedence: explicit `publicOrigin` override > the domain actually used by
+     * the settings page (with the proxy's real port substituted when the settings
+     * page runs on the DSH app's own port) > the legacy LAN-IP guess. The live
+     * login flow never uses this: it builds `redirect_uri` from `gate.origin`.
+     */
+    private publicOrigin;
+    /** Settings view of the third-party login surface; null when not wired in. */
+    oauthStatus(requestOrigin?: string): LanProxyOAuthView | null;
+    /** Validate + persist an OAuth config patch (effective on the next request). */
+    updateOAuth(payload: unknown, requestOrigin?: string): OAuthViewResult;
+    /** Start a manual binding flow from the settings page. */
+    startOAuthBinding(payload: unknown, requestOrigin?: string): {
+        ok: true;
+        startUrl: string;
+    } | {
+        ok: false;
+        message: string;
+    };
+    /** Remove one manual binding; the account loses access immediately. */
+    removeOAuthBinding(payload: unknown, requestOrigin?: string): OAuthViewResult;
 }

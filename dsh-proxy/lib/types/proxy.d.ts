@@ -1,4 +1,5 @@
 import { AuthState, type AuditEntry } from './auth.ts';
+import type { OAuthGateLike } from './oauth/runtime.ts';
 export interface LanProxyOptions {
     /** Interface the proxy binds (0.0.0.0 for LAN access). */
     listenHost: string;
@@ -48,6 +49,12 @@ export interface LanProxyOptions {
     loginTitle?: string;
     /** Sink for gate events the session store does not own (e.g. a refused cleartext request). */
     audit?: (entry: AuditEntry) => void;
+    /**
+     * Third-party login runtime. When absent, every OAuth behaviour is off and
+     * the proxy behaves exactly as before. Its `authEnabled` also participates in
+     * the gate decision (D2).
+     */
+    oauth?: OAuthGateLike;
     /** Optional sink for human-readable lifecycle messages. */
     log?: (level: 'info' | 'warn' | 'error', message: string) => void;
 }

@@ -1,3 +1,9 @@
+/**
+ * Persisted runtime settings for the LAN proxy: a small YAML file under the
+ * DSH home that overlays the cordis config. The settings page writes here so
+ * changes survive `dsh web` restarts; the file is the single source of truth
+ * for the runtime overrides (proxy listen port, username, password).
+ */
 import type { LanProxyUpdatePayload } from './contract.ts';
 /** The on-disk shape (a subset of the update payload; no derived fields). */
 export interface PersistedRuntimeSettings {
@@ -8,11 +14,11 @@ export interface PersistedRuntimeSettings {
     username?: string;
     password?: string;
 }
-/** Tolerant read of an unknown JSON value into the persisted shape. */
+/** Tolerant read of an unknown YAML/JSON value into the persisted shape. */
 export declare function normalizeRuntimeSettings(raw: unknown): PersistedRuntimeSettings;
 /**
  * Read/write access to the persisted settings file. Writes are atomic
- * (temp file + rename) so a crash never leaves a truncated JSON behind.
+ * (temp file + rename) so a crash never leaves a truncated file behind.
  */
 export declare class RuntimeSettingsFile {
     private readonly filePath;

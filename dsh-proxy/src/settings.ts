@@ -1,12 +1,11 @@
 /**
- * Persisted runtime settings for the LAN proxy: a small JSON file under the
+ * Persisted runtime settings for the LAN proxy: a small YAML file under the
  * DSH home that overlays the cordis config. The settings page writes here so
  * changes survive `dsh web` restarts; the file is the single source of truth
  * for the runtime overrides (proxy listen port, username, password).
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import type { LanProxyUpdatePayload } from './contract.ts'
+import { readStateYaml, writeStateYaml } from './state-file.ts'
 
 /** The on-disk shape (a subset of the update payload; no derived fields). */
 export interface PersistedRuntimeSettings {
@@ -18,7 +17,7 @@ export interface PersistedRuntimeSettings {
   password?: string
 }
 
-/** Tolerant read of an unknown JSON value into the persisted shape. */
+/** Tolerant read of an unknown YAML/JSON value into the persisted shape. */
 export function normalizeRuntimeSettings(raw: unknown): PersistedRuntimeSettings {
   if (typeof raw !== 'object' || raw === null) return {}
   const source = raw as Record<string, unknown>
@@ -36,30 +35,17 @@ export function normalizeRuntimeSettings(raw: unknown): PersistedRuntimeSettings
 
 /**
  * Read/write access to the persisted settings file. Writes are atomic
- * (temp file + rename) so a crash never leaves a truncated JSON behind.
+ * (temp file + rename) so a crash never leaves a truncated file behind.
  */
 export class RuntimeSettingsFile {
   constructor(private readonly filePath: string) {}
 
   read(): PersistedRuntimeSettings {
-    let text: string
-    try {
-      text = readFileSync(this.filePath, 'utf8')
-    } catch {
-      return {}
-    }
-    try {
-      return normalizeRuntimeSettings(JSON.parse(text))
-    } catch {
-      return {}
-    }
+    return readStateYaml(this.filePath, normalizeRuntimeSettings, () => ({}))
   }
 
   write(settings: PersistedRuntimeSettings): void {
-    mkdirSync(dirname(this.filePath), { recursive: true })
-    const temp = `${this.filePath}.tmp`
-    writeFileSync(temp, JSON.stringify(settings, null, 2) + '\n', 'utf8')
-    renameSync(temp, this.filePath)
+    writeStateYaml(this.filePath, settings)
   }
 }
 

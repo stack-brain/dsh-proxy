@@ -29,6 +29,20 @@ export const ENDPOINT_AUDIT = 'audit'
 export const ENDPOINT_AUTH_REVOKE = 'auth-revoke'
 /** Endpoint: persist the transport policy (`requireTls`). */
 export const ENDPOINT_SECURITY = 'security'
+/** Endpoint: read the (masked-in-UI) third-party login config and bindings. */
+export const ENDPOINT_OAUTH_STATUS = 'oauth-status'
+/** Endpoint: validate and persist a third-party login config patch. */
+export const ENDPOINT_OAUTH_UPDATE = 'oauth-update'
+/** Endpoint: issue a one-shot ticket and return the account-binding start URL. */
+export const ENDPOINT_OAUTH_BINDING_START = 'oauth-binding-start'
+/** Endpoint: remove one manual binding. */
+export const ENDPOINT_OAUTH_BINDING_REMOVE = 'oauth-binding-remove'
+/** Same-origin BroadcastChannel shared by the OAuth popup result and its opener. */
+export const OAUTH_CHANNEL = 'dsh-proxy-oauth'
+/** Marker carried by every OAuth popup result message. */
+export const OAUTH_MESSAGE_SOURCE = 'dsh-proxy-oauth'
+/** How long an authorization popup may stay open before its opener gives up. */
+export const OAUTH_POPUP_TIMEOUT_MS = 3 * 60 * 1000
 
 /** Request body the settings section POSTs to {@link LAN_PROXY_PATH}. */
 export interface LanProxyRequest {
@@ -82,8 +96,10 @@ export interface LanProxyStatus {
    * $DSH_HOME file is equally readable).
    */
   password: string
-  /** Whether the auth gate is on (both credentials non-empty). */
+  /** Whether the auth gate is on (both credentials non-empty, or OAuth enabled). */
   authEnabled: boolean
+  /** Whether at least one third-party provider is enabled (optional for older hosts). */
+  oauthEnabled?: boolean
   /**
    * Whether the running listener is reachable from the network without a
    * password (see {@link isLanExposed}). The settings section flags this in red
@@ -189,6 +205,8 @@ export interface LanProxyAuthView {
   cleartextAuth: 'login' | 'basic'
   /** Whether the login form is reachable at all (password login on). */
   loginEnabled: boolean
+  /** Whether third-party login is enabled (optional for older hosts). */
+  oauthEnabled?: boolean
   /** Reserved path of the login form. */
   loginPath: string
   /** Reserved path that logs the current session out. */
@@ -262,4 +280,102 @@ export interface LanProxyUpdateResult {
    * `notice` is `saved-restart-failed`, this carries the rebind error reason.
    */
   message: string
+}
+
+/** Built-in third-party login channels. */
+export type LanProxyOAuthProviderId = 'github' | 'google' | 'feishu' | 'casdoor'
+
+/** Endpoint URLs as resolved by the host (official defaults or overrides). */
+export interface LanProxyOAuthEndpointsView {
+  authorizationEndpoint: string
+  tokenEndpoint: string
+  userInfoEndpoint: string
+  jwksEndpoint?: string
+  issuer?: string
+}
+
+/** One provider as the settings page renders it. */
+export interface LanProxyOAuthProviderView {
+  enabled: boolean
+  label: string
+  clientId: string
+  /** Current value, like `LanProxyStatus.password`; the UI masks the input. */
+  clientSecret: string
+  scopes: string
+  /** Per-provider auth-center base URL (blank = official or shared center). */
+  baseUrl?: string
+  endpoints: LanProxyOAuthEndpointsView
+  /** Explicit overrides (blank unless the operator configured them). */
+  endpointOverrides?: Partial<LanProxyOAuthEndpointsView>
+  /** Effective `provider_hint` value sent to a custom authorize endpoint. */
+  providerHint?: string
+  redirectUri: string
+  effectiveSource: 'official' | 'auth-center' | 'provider-override'
+  /** Reasons this provider cannot serve a login (empty = ready). */
+  issues: string[]
+  displayOnLogin: boolean
+}
+
+/** One manual binding (never contains a token or a secret). */
+export interface LanProxyOAuthBindingView {
+  id: string
+  provider: LanProxyOAuthProviderId
+  subject: string
+  email?: string
+  displayName?: string
+  localSubject: string
+  boundAt: number
+  boundVia: 'settings' | 'bootstrap'
+}
+
+/** The third-party login surface the settings page reads. */
+export interface LanProxyOAuthView {
+  enabled: boolean
+  /** Externally reachable proxy origin used for binding links / redirect URIs. */
+  publicOrigin: string
+  authCenter: { baseUrl: string; endpoints: Partial<LanProxyOAuthEndpointsView> }
+  providers: Record<LanProxyOAuthProviderId, LanProxyOAuthProviderView>
+  bindings: LanProxyOAuthBindingView[]
+  /** Whether ANY authentication method is configured (drives the empty-state hint). */
+  hasAnyAuth: boolean
+  /** Basic mode cannot show channel buttons on the login page. */
+  cleartextAuth: 'login' | 'basic'
+}
+
+/** One provider's editable fields in a settings patch. */
+export interface LanProxyOAuthProviderPatch {
+  enabled?: boolean
+  clientId?: string
+  clientSecret?: string
+  scopes?: string[]
+  baseUrl?: string
+  endpoints?: Partial<LanProxyOAuthEndpointsView>
+  redirectUri?: string
+  label?: string
+  /** `provider_hint` sent to a custom authorize endpoint (blank = not sent). */
+  providerHint?: string
+}
+
+/** Settings patch: omitted fields keep their current values. */
+export interface LanProxyOAuthUpdatePayload {
+  enabled?: boolean
+  publicOrigin?: string
+  stateTtlMs?: number
+  authCenter?: { baseUrl?: string; endpoints?: Partial<LanProxyOAuthEndpointsView> }
+  providers?: Partial<Record<LanProxyOAuthProviderId, LanProxyOAuthProviderPatch>>
+}
+
+/** Request payload for {@link ENDPOINT_OAUTH_BINDING_START}. */
+export interface LanProxyOAuthBindingStartPayload {
+  provider: LanProxyOAuthProviderId
+}
+
+/** Successful binding-start response: an absolute URL on the proxy's origin. */
+export interface LanProxyOAuthBindingStartResult {
+  startUrl: string
+}
+
+/** Request payload for {@link ENDPOINT_OAUTH_BINDING_REMOVE}. */
+export interface LanProxyOAuthBindingRemovePayload {
+  id: string
 }

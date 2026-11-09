@@ -253,6 +253,7 @@ describe('login-page gate (session auth)', () => {
     expect(res.headers['cache-control']).toContain('no-store')
     expect(res.headers['referrer-policy']).toBe('no-referrer')
     expect(res.headers['content-security-policy']).toContain("default-src 'none'")
+    expect(res.headers['content-security-policy']).toContain("script-src 'unsafe-inline'")
     expect(res.headers['x-frame-options']).toBe('DENY')
   })
 
@@ -280,6 +281,12 @@ describe('login-page gate (session auth)', () => {
     const app = await rawGetAt(port, '/api/state', { host: '127.0.0.1', cookie: cookie ?? '' })
     expect(app.status).toBe(200)
     expect(store.sessionCount).toBe(1)
+
+    // Refreshing/revisiting the login path with a live session must not strand
+    // the user back on the form — a third-party login sends its opener to `/`.
+    const revisit = await rawGetAt(port, '/__dsh-proxy/login', { host: '127.0.0.1', cookie: cookie ?? '' })
+    expect(revisit.status).toBe(303)
+    expect(revisit.headers.location).toBe('/')
   })
 
   it('re-serves the form with a neutral error on a wrong password', async () => {

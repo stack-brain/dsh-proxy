@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { parse as parseYaml } from 'yaml'
 import { AuthState, startLanProxy } from '../lib/index.cjs'
 
 const UPSTREAM = Number(process.env.DSH_SMOKE_UPSTREAM_PORT ?? 3080)
@@ -306,10 +307,10 @@ async function pluginContractPhase() {
       status2?.ok === true && status2.value?.username === 'smoke-user' && status2.value?.persisted === true,
     )
 
-    const stateFile = join(profileDir, 'dsh-proxy', 'dsh-proxy.json')
-    const persisted = JSON.parse(readFileSync(stateFile, 'utf8'))
+    const stateFile = join(profileDir, 'dsh-proxy', 'dsh-proxy.yaml')
+    const persisted = parseYaml(readFileSync(stateFile, 'utf8'))
     check(
-      'patch persisted to the profile-private dsh-proxy.json',
+      'patch persisted to the profile-private dsh-proxy.yaml',
       persisted.username === 'smoke-user' && persisted.password === 'smoke-pass',
     )
     check(

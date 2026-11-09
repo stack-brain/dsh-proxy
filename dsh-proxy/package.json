@@ -76,7 +76,8 @@
     "react-dom": "^18.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "yaml": "^2.9.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

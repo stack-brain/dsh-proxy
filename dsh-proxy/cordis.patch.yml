@@ -3,6 +3,26 @@
 # in src/index.ts; override them from the profile's own cordis.patch.yml by
 # targeting this row's id (the patch replaces the whole config, so restate
 # every key you own).
+#
+# Third-party login (all channels OFF by default). GitHub / Google / Feishu use
+# their official endpoints unless overridden; authCenter.baseUrl points all
+# channels at a self-hosted Casdoor, and casdoor is also a built-in provider.
+# Only accounts manually bound in the settings page may sign in. Example:
+#
+#   oauth:
+#     enabled: true
+#     authCenter:
+#       baseUrl: 'https://casdoor.internal.example.com'
+#     providers:
+#       github: { enabled: true, clientId: 'Iv1.xxxx', clientSecret: 'xxxx', providerHint: 'github' }
+#       casdoor: { enabled: true, clientId: 'xxxx', clientSecret: 'xxxx' }
+#
+# providerHint adds provider_hint=<value> to the authorize request when a
+# channel uses custom/Casdoor endpoints (github -> github); omit it for official
+# endpoints, where the parameter is never sent.
+#
+# Register <proxy-origin>/__dsh-proxy/oauth/<channel>/callback at each IdP.
+# See README.md / README.zh.md for the full deployment checklist.
 
 # The plugin serves browsers that cannot see the host display, so the in-app
 # (browse) directory chooser is the right backend: `directory-picker-auto`

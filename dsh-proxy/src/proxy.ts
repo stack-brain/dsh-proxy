@@ -47,6 +47,7 @@ import { isTrustedProxyPeer, resolveClientAddress, resolveGate, resolveSecureTra
 import { injectPolyfill, RANDOM_UUID_POLYFILL } from './polyfill.ts'
 import { isJavaScriptContentType, patchClientScript } from './clientpatch.ts'
 import { attachBodyTransform } from './compression.ts'
+import type { OAuthGateLike } from './oauth/runtime.ts'
 
 export interface LanProxyOptions {
   /** Interface the proxy binds (0.0.0.0 for LAN access). */
@@ -97,6 +98,12 @@ export interface LanProxyOptions {
   loginTitle?: string
   /** Sink for gate events the session store does not own (e.g. a refused cleartext request). */
   audit?: (entry: AuditEntry) => void
+  /**
+   * Third-party login runtime. When absent, every OAuth behaviour is off and
+   * the proxy behaves exactly as before. Its `authEnabled` also participates in
+   * the gate decision (D2).
+   */
+  oauth?: OAuthGateLike
   /** Optional sink for human-readable lifecycle messages. */
   log?: (level: 'info' | 'warn' | 'error', message: string) => void
 }
@@ -314,8 +321,13 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
    * Whether the credential gate applies at all. An incomplete credential pair
    * means "no password": the long-standing open behaviour, where the whole surface
    * is reachable without a login — never a redirect to a form nobody can satisfy.
+   *
+   * An enabled, fully configured OAuth provider counts as a second authentication
+   * method (D2). With NEITHER method configured the gate stays off (D2′: open
+   * access + warning unchanged), and the OAuth runtime refuses all of its own
+   * routes, so no login entry is ever rendered in that state.
    */
-  const gateEnforced = (): boolean => auth.enabled
+  const gateEnforced = (): boolean => auth.enabled || options.oauth?.authEnabled === true
 
   /** The per-client key used for throttling and auditing. */
   const clientAddressFor = (req: http.IncomingMessage): string => {
@@ -334,9 +346,12 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
     'content-type': contentType,
     'cache-control': 'no-store, must-revalidate',
     'referrer-policy': 'no-referrer',
-    // The page is self-contained (one inline style block, no script, no frames),
-    // so the policy can be maximally strict.
-    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    // Self-contained page: one inline style block and (only when OAuth channels
+    // exist) one inline script that opens a script-owned popup. default-src
+    // 'none' still forbids every external resource; the inline script must be
+    // allowed or the browser falls back to a plain tab that cannot be closed.
+    // Every interpolated value is escaped server-side.
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
   })
@@ -425,10 +440,12 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
   }
 
   /** Serve the login form, carrying an optional already-localized error. */
-  const serveLoginPage = (res: http.ServerResponse, gate: { secure: boolean }, error?: string): void => {
+  const serveLoginPage = (res: http.ServerResponse, gate: ReturnType<typeof resolveGate>, error?: string): void => {
     const html = renderLoginPage({
       action: LOGIN_PATH,
       secure: gate.secure,
+      providers: options.oauth?.loginProviders(gate.mode) ?? [],
+      passwordForm: auth.enabled,
       ...(options.loginTitle === undefined ? {} : { title: options.loginTitle }),
       ...(error === undefined ? {} : { error }),
     })
@@ -448,11 +465,26 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
     pathname: string,
     gate: ReturnType<typeof resolveGate>,
   ): Promise<boolean> => {
+    // OAuth routes are answered here even while the gate is OFF: the runtime
+    // refuses them (D2′) instead of letting them fall through to the upstream.
+    if (options.oauth !== undefined
+      && await options.oauth.handle(req, res, pathname, gate, clientAddressFor(req))) {
+      return true
+    }
     const store = options.auth
     if (store === undefined || gate.mode !== 'session' || !gateEnforced()) return false
 
     if (pathname === LOGIN_PATH) {
       if (req.method === 'GET' || req.method === 'HEAD') {
+        // A successful third-party login sends the opener to `/`. If the user
+        // later revisits or refreshes the login path with a live session, do
+        // not strand them on a form they have already satisfied.
+        const existing = options.auth?.authenticate(readCookie(req.headers.cookie, gate.cookieName))
+        if (existing !== null && existing !== undefined) {
+          res.writeHead(303, { 'cache-control': 'no-store', location: '/' })
+          res.end()
+          return true
+        }
         serveLoginPage(res, gate)
         return true
       }
@@ -554,8 +586,9 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
       }
 
       // A session gate accepts a valid cookie; the Basic path (a plain LAN) keeps
-      // the native dialog, and BOTH accept Basic credentials so an existing
-      // configured client keeps working after an upgrade.
+      // the native dialog. Basic credentials count ONLY when a local password
+      // pair is configured: with OAuth as the sole method, `Authenticator`
+      // would otherwise return true for every request and bypass the gate.
       const session = gate.mode === 'session'
         ? options.auth?.authenticate(readCookie(req.headers.cookie, gate.cookieName))
         : null
@@ -564,7 +597,8 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
         proxy.web(req, res)
         return
       }
-      if (!auth.isAuthenticated(req.headers.authorization)) {
+      const basicAllowed = auth.enabled && auth.isAuthenticated(req.headers.authorization)
+      if (!basicAllowed) {
         if (gate.mode === 'session') {
           // No browser dialog here: send the visitor to the form they can use.
           res.writeHead(303, {
@@ -598,7 +632,8 @@ export function startLanProxy(options: LanProxyOptions): LanProxyHandle {
       ? options.auth?.authenticate(readCookie(req.headers.cookie, gate.cookieName))
       : null
     if (session === null || session === undefined) {
-      if (!auth.isAuthenticated(req.headers.authorization)) {
+      const basicAllowed = auth.enabled && auth.isAuthenticated(req.headers.authorization)
+      if (!basicAllowed) {
         socket.end(`HTTP/1.1 401 Unauthorized\r\nwww-authenticate: Basic realm="${AUTH_REALM}"\r\nConnection: close\r\n\r\n`)
         return
       }

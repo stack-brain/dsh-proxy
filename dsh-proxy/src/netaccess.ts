@@ -187,12 +187,20 @@ export function resolveGate(input: {
   }
   if (authority === '') authority = 'localhost'
   const loopback = isLoopbackAddress(hostname)
-  // Browsers treat http://localhost and http://127.0.0.1 as secure contexts, so a
-  // `__Host-` + Secure cookie works there even without TLS.
-  const secure = input.secure || input.socketEncrypted || loopback
-  const scheme = secure ? 'https' : 'http'
+  // Two DISTINCT notions must not be conflated:
+  // - `transportSecure` is the scheme the browser ACTUALLY used. It decides the
+  //   URL prefix in `origin`, which feeds redirects and OAuth `redirect_uri`.
+  // - `secureContext` decides whether a `__Host-` + `Secure` cookie is stored.
+  //   Browsers treat http://localhost and http://127.0.0.1 as secure contexts,
+  //   so loopback counts here even though the transport is plain HTTP.
+  // Calling a loopback HTTP listener `https://` produced redirect_uri values
+  // like `https://127.0.0.1:3081/...`; the browser then failed the TLS
+  // handshake against a plain-HTTP port (ERR_SSL_PROTOCOL_ERROR).
+  const transportSecure = input.secure || input.socketEncrypted
+  const secureContext = transportSecure || loopback
+  const scheme = transportSecure ? 'https' : 'http'
 
-  if (secure) {
+  if (secureContext) {
     return {
       mode: 'session',
       secure: true,

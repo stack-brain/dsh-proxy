@@ -427,6 +427,72 @@ export const cssText = `
   outline: 2px solid var(--dsw-alias-state-error-primary, #f85149);
   outline-offset: 2px;
 }
+.dsh_lanproxy_oauthChannel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-primary, #30363d);
+  border-radius: 8px;
+}
+.dsh_lanproxy_oauthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.dsh_lanproxy_oauthBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary, #e6edf3);
+  font-size: 14px;
+  font-weight: 600;
+}
+.dsh_lanproxy_checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary, #c9d1d9);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.dsh_lanproxy_checkboxLabel input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--dsw-alias-accent, #2f81f7);
+}
+.dsh_lanproxy_mono {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.dsh_lanproxy_bindingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--dsw-alias-border-primary, #30363d);
+}
+.dsh_lanproxy_tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-primary, #30363d);
+  border-radius: 10px;
+  color: var(--dsw-alias-label-tertiary, #8b949e);
+  font-size: 11px;
+  line-height: 18px;
+}
 `
 
 /** Inject the stylesheet once (idempotent). */

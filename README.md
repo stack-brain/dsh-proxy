@@ -9,7 +9,7 @@ HTTP + WebSocket 反向代理：把局域网端口转发到本地 DSH 服务 `12
 
 **推荐 DSH（DeepSeek Harness）用户使用**：把代理作为插件装进 web profile，**随 `dsh web` 启停**，无需单独进程、无需下载可执行文件，带完整设置页面。
 
-- 与独立版相同的原生 **Basic Auth**（浏览器弹窗）与 HTTP + WebSocket 全协议转发
+- HTTP + WebSocket 全协议转发；默认**自带登录页 + 会话**，可启用**第三方登录**（GitHub / Google / 飞书 / Casdoor），也可切回浏览器原生 **Basic Auth** 弹窗
 - **设置页面**（DSH 设置 → 局域网代理）：状态红绿灯、启动/停止、改代理监听端口与用户名密码（表单回写当前值，留空即设为空）
 - 默认空凭据 = 密码登录关闭；**同时设置**用户名和密码才启用
 
@@ -31,7 +31,7 @@ dsh plugin --profile web add github:stack-brain/dsh-proxy#master
 dsh plugin --profile web add file:C:/mydata/codes/dsh-proxy
 ```
 
-重启 `dsh web` 后，访问 `http://<局域网IP>:3081` 即弹 Basic Auth 登录框。详细说明见 [`dsh-proxy/README.zh.md`](dsh-proxy/README.zh.md)。
+重启 `dsh web` 后，访问 `http://<局域网IP>:3081` 会看到登录页；在设置页启用第三方渠道后可用对应账号授权登录（`cleartextAuth: 'basic'` 时才是浏览器原生弹窗）。详细说明见 [`dsh-proxy/README.zh.md`](dsh-proxy/README.zh.md)。
 
 ## 独立可执行版本（go/ 与 node/）
 

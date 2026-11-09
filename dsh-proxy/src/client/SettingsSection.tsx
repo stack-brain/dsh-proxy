@@ -23,6 +23,7 @@ import {
   type LanProxyUpdateResult,
 } from '../contract.ts'
 import type { LanProxyKey } from './locales.ts'
+import { OAuthCard } from './OAuthCard.tsx'
 import { SecurityCard } from './SecurityCard.tsx'
 import type { LanProxyCall } from './transport.ts'
 
@@ -381,6 +382,7 @@ export function SettingsSection({ call, t }: SettingsSectionProps) {
       </form>
 
       <SecurityCard call={call} t={t} />
+      <OAuthCard call={call} t={t} />
     </section>
   )
 }
