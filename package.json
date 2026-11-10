@@ -1,7 +1,7 @@
 {
   "name": "@stack-brain/dsh-proxy",
   "description": "DSH plugin (scoped package @stack-brain/dsh-proxy, matching the repository): LAN reverse proxy with native Basic Auth and a settings page. Source lives in this repo's dsh-proxy/ subdirectory; this root package makes the plugin installable from the repository itself (git/github: specs install the root).",
-  "version": "0.2.0",
+  "version": "1.0.1",
   "license": "MIT",
   "type": "module",
   "main": "dsh-proxy/lib/index.cjs",
