@@ -113,7 +113,10 @@ function draftFromView(view) {
   return {
     enabled: view.enabled,
     authCenterBaseUrl: view.authCenter.baseUrl,
-    publicOrigin: view.publicOrigin,
+    // `publicOrigin` is the RESOLVED origin (override > page > inference); the
+    // editable field must show the operator's raw override instead, or clearing
+    // it would be silently refilled with the inferred address after saving.
+    publicOrigin: view.publicOriginOverride ?? "",
     channels
   };
 }
@@ -298,6 +301,9 @@ function OAuthCard({ call, t }) {
           if (next.providers[id].providerHint === void 0) {
             refreshed.channels[id].providerHint = draft.channels[id].providerHint;
           }
+        }
+        if (next.publicOriginOverride === void 0) {
+          refreshed.publicOrigin = draft.publicOrigin.trim();
         }
         setDraft(refreshed);
         setMessage(t("oauth.saved"));

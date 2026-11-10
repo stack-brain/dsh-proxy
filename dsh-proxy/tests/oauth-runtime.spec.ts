@@ -103,10 +103,11 @@ function harness(oauthInput: unknown = {}, options: { gateDecision?: GateDecisio
     getLocalSubject: () => 'admin',
     hasPassword: () => state.password,
     cleartextAuth: () => state.mode,
-    // Mirror ProxyController: explicit override > settings page request origin >
-    // legacy inference.
+    // Mirror ProxyController: read the LIVE override (the controller reads
+    // `oauth.effective`), not the config snapshot captured at construction —
+    // otherwise clearing publicOrigin would still resolve to the old value.
     publicOrigin: (requestOrigin?: string) => resolveOAuthOrigin({
-      configured: configured.publicOrigin,
+      configured: stateFile.read().overlay?.publicOrigin ?? configured.publicOrigin,
       requestOrigin,
       listenPort: 3081,
       inferred: 'http://127.0.0.1:3081',
@@ -143,6 +144,28 @@ const githubEnabled = (extra: unknown = {}) => ({
 })
 
 describe('status view', () => {
+  it('reports the raw override separately from the resolved origin', () => {
+    const configured = harness(githubEnabled({ publicOrigin: 'https://sso.example.com' }))
+    expect(configured.runtime.statusView().publicOriginOverride).toBe('https://sso.example.com')
+    expect(configured.runtime.statusView().publicOrigin).toBe('https://sso.example.com')
+
+    const auto = harness(githubEnabled())
+    const view = auto.runtime.statusView('http://127.0.0.1:3080')
+    expect(view.publicOriginOverride).toBe('')
+    expect(view.publicOrigin).toBe('http://127.0.0.1:3081')
+  })
+
+  it('persists a cleared override and falls back to the settings page origin', () => {
+    const h = harness(githubEnabled({ publicOrigin: 'https://sso.example.com' }))
+    const result = h.runtime.updateConfig({ publicOrigin: '' }, 'http://localhost:3080')
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.view.publicOriginOverride).toBe('')
+      expect(result.view.publicOrigin).toBe('http://localhost:3081')
+    }
+    expect(h.stateFile.read().overlay?.publicOrigin).toBe('')
+  })
+
   it('defaults to all channels OFF with official endpoints', () => {
     const h = harness()
     const view = h.runtime.statusView()

@@ -236,6 +236,7 @@ export class OAuthRuntime implements OAuthGateLike {
     return {
       enabled: this.config.enabled,
       publicOrigin,
+      publicOriginOverride: this.config.publicOrigin?.trim() ?? '',
       authCenter: {
         baseUrl: this.config.authCenter?.baseUrl ?? '',
         endpoints: this.config.authCenter?.endpoints ?? {},

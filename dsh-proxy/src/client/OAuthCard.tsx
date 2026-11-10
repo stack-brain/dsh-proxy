@@ -100,7 +100,10 @@ function draftFromView(view: LanProxyOAuthView): Draft {
   return {
     enabled: view.enabled,
     authCenterBaseUrl: view.authCenter.baseUrl,
-    publicOrigin: view.publicOrigin,
+    // `publicOrigin` is the RESOLVED origin (override > page > inference); the
+    // editable field must show the operator's raw override instead, or clearing
+    // it would be silently refilled with the inferred address after saving.
+    publicOrigin: view.publicOriginOverride ?? '',
     channels,
   }
 }
@@ -308,6 +311,11 @@ export function OAuthCard({ call, t }: OAuthCardProps): ReactNode {
           if (next.providers[id].providerHint === undefined) {
             refreshed.channels[id].providerHint = draft.channels[id].providerHint
           }
+        }
+        // Older host bundles do not echo publicOriginOverride. Keep what was
+        // just submitted instead of falling back to the resolved origin.
+        if (next.publicOriginOverride === undefined) {
+          refreshed.publicOrigin = draft.publicOrigin.trim()
         }
         setDraft(refreshed)
         setMessage(t('oauth.saved'))

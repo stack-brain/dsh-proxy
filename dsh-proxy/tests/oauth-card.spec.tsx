@@ -47,6 +47,7 @@ const channel = (label: string, enabled: boolean, id: string): LanProxyOAuthProv
 const view = (overrides: Partial<LanProxyOAuthView> = {}): LanProxyOAuthView => ({
   enabled: true,
   publicOrigin: 'http://127.0.0.1:3081',
+  publicOriginOverride: '',
   authCenter: { baseUrl: '', endpoints: {} },
   providers: {
     github: channel('GitHub', true, 'github'),
@@ -158,6 +159,34 @@ describe('OAuthCard', () => {
     expect(hints).toContain('https://accounts.feishu.cn/open-apis/authen/v1/authorize')
     expect(new Set(hints).size).toBe(4)
     expect(container.querySelector('#oauth-auth-center')?.getAttribute('placeholder')).toBe('https://sso.example.com')
+  })
+
+  it('shows the configured override, not the resolved origin, in the editable field', async () => {
+    const { container } = await render(view({
+      publicOriginOverride: 'https://sso.example.com',
+      publicOrigin: 'http://127.0.0.1:3081',
+    }))
+    expect((container.querySelector('#oauth-public-origin') as HTMLInputElement).value).toBe('https://sso.example.com')
+  })
+
+  it('keeps the external origin blank after clearing and saving it', async () => {
+    const { container, calls } = await render()
+    const input = container.querySelector('#oauth-public-origin') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    expect(input.value).toBe('')
+    setter?.call(input, 'https://dsh.example.com')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await flush()
+    setter?.call(input, '')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await flush()
+    const form = container.querySelector('form') as HTMLFormElement
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flush()
+    await flush()
+    const update = calls.find(entry => entry.endpoint === ENDPOINT_OAUTH_UPDATE)
+    expect((update?.payload as { publicOrigin: string }).publicOrigin).toBe('')
+    expect((container.querySelector('#oauth-public-origin') as HTMLInputElement).value).toBe('')
   })
 
   it('keeps the zh and en key sets identical', () => {

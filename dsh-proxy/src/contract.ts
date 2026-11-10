@@ -331,8 +331,14 @@ export interface LanProxyOAuthBindingView {
 /** The third-party login surface the settings page reads. */
 export interface LanProxyOAuthView {
   enabled: boolean
-  /** Externally reachable proxy origin used for binding links / redirect URIs. */
+  /** Effective origin used for binding links / redirect URIs (override > page > inference). */
   publicOrigin: string
+  /**
+   * The operator's raw override, exactly as saved. Empty means "not set" — this
+   * is what the editable input shows, NOT the resolved origin above. Optional
+   * so views from older host bundles remain readable.
+   */
+  publicOriginOverride?: string
   authCenter: { baseUrl: string; endpoints: Partial<LanProxyOAuthEndpointsView> }
   providers: Record<LanProxyOAuthProviderId, LanProxyOAuthProviderView>
   bindings: LanProxyOAuthBindingView[]
