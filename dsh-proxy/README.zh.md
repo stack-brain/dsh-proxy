@@ -158,6 +158,28 @@ dsh plugin --profile web add file:C:/mydata/codes/dsh-proxy
 - `DSH_HOME` 环境变量照常生效；若宿主的 `ctx.baseUrl` 无法解析出 profile 目录，插件会**自动回退**到共享目录并在启动日志打 warn，不会导致加载失败。启动日志里的「状态目录」一行可确认当前生效路径。
 - ⚠️ **端口不会自动错开**：`listenPort` 默认仍是 3081。两个 profile 同时运行 `dsh web` 时，第二个会绑定失败（controller 已优雅降级，不会拖垮 web app，日志会给出原因）。需要并行时，在各自 `cordis.patch.yml` 里配不同的 `listenPort`，或各自在设置页改端口。
 
+### 暴露的接口
+
+所有认证相关接口都挂在代理前的统一前缀 `/__dsh-proxy/` 下，无需额外开放端口；其中 OAuth 回调由 IdP 直接访问，需在外网/局域网可达的地址上注册：
+
+| 接口 | 方法 | 用途 |
+|---|---|---|
+| `/__dsh-proxy/login` | GET | 登录页（未认证访问任意路径也会呈现同一登录页） |
+| `/__dsh-proxy/logout` | GET | 登出，清除当前会话 Cookie |
+| `/__dsh-proxy/oauth/<id>/start` | GET | 发起**登录**授权：302 跳转到 IdP 授权页（带 PKCE + state） |
+| `/__dsh-proxy/oauth/<id>/bind/start` | GET | 发起**绑定**授权：需设置页下发的一次性 `ticket`（`?ticket=`） |
+| `/__dsh-proxy/oauth/<id>/callback` | GET | **回调接口**：IdP 授权后回跳此处，`code` 换 token、取用户信息、签发/绑定会话 |
+
+`<id>` 为渠道：`github` / `google` / `feishu` / `casdoor`。需注册到 IdP 的回调地址即 `<代理外部地址>/__dsh-proxy/oauth/<id>/callback`——该地址默认**自动跟随浏览器当前访问代理的域名与端口**（如 `http://192.168.1.5:3081/...`，直连本机为 `http://127.0.0.1:3081/...`），无需写死；只有当 TLS 反代的外域名无法从请求推断时，才用 `oauth.publicOrigin` 固定。
+
+### 授权流程
+
+1. **在 IdP 创建应用**：于 GitHub / Google / 飞书 / Casdoor 新建 OAuth 应用，把回调地址填为上面那一条（设置页「第三方登录」会直接给出当前域名 + 代理真实端口的可复制地址）。
+2. **启用并配置渠道**：DSH 设置页 → 局域网代理 → 第三方登录，填入对应 `clientId` / `clientSecret`（官方端点仅需这两项），开启渠道；自建 Casdoor 再填 `baseUrl`（或 `authCenter.baseUrl`）。
+3. **先绑定再登录**：在「账号绑定」点「绑定 GitHub」等按钮 → 弹窗走 `/oauth/<id>/bind/start` + `callback`，把 `(渠道, 稳定标识)` 写入绑定表。未绑定的账号即使通过 IdP 也会被拒绝。
+4. **登录**：访问 `http://<LAN-IP>:3081/`，登录页只显示已启用的渠道按钮；点击后弹窗访问 `/oauth/<id>/start` → 跳转 IdP 授权 → 回跳 `callback` 完成 `code` 换 token、读取用户信息、校验绑定 → 签发与密码登录相同的会话 Cookie，弹窗关闭、主页面跳转到 `/`。
+5. **会话管理**：登录后在设置页可查看活动会话、登出或踢出；`cleartextAuth: 'basic'` 模式下无会话/登出概念。
+
 ## 设置页面（改端口 / 账号密码 / 启停）
 
 重启 `dsh web` 后，打开 DSH 设置（左下角齿轮）→ 「局域网代理」：

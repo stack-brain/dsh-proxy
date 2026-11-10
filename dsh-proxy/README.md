@@ -157,6 +157,28 @@ The four persisted state files (runtime settings / login audit / transport polic
 - `$DSH_HOME` still applies. If the host's `ctx.baseUrl` cannot be resolved to a profile directory, the plugin **falls back** to the shared home and logs a warning instead of failing to load; the "state directory" startup log line shows the effective path.
 - ⚠️ **Ports are not staggered automatically**: `listenPort` still defaults to 3081. Running two profiles' `dsh web` at the same time makes the second bind fail (the controller degrades gracefully and never takes the web app down; the log explains why). Give each profile a different `listenPort` in its `cordis.patch.yml`, or change it in each settings page.
 
+### Exposed endpoints
+
+All auth endpoints live under the proxy-fronting prefix `/__dsh-proxy/` and need no extra port; the OAuth callback is hit directly by the IdP, so it must be reachable at the external/LAN address you register:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/__dsh-proxy/login` | GET | The login page (any unauthenticated path also renders the same page) |
+| `/__dsh-proxy/logout` | GET | Log out, clears the current session cookie |
+| `/__dsh-proxy/oauth/<id>/start` | GET | Begin **sign-in**: 302 to the IdP authorize page (with PKCE + state) |
+| `/__dsh-proxy/oauth/<id>/bind/start` | GET | Begin **binding**: requires the one-shot `ticket` from settings (`?ticket=`) |
+| `/__dsh-proxy/oauth/<id>/callback` | GET | **Callback**: IdP redirects here; `code` → token → userinfo → issue/bind session |
+
+`<id>` is the channel: `github` / `google` / `feishu` / `casdoor`. The redirect URI to register at the IdP is exactly `<proxy-external-origin>/__dsh-proxy/oauth/<id>/callback` — by default it **follows the domain and port the browser actually used to reach the proxy** (e.g. `http://192.168.1.5:3081/...`; a direct loopback is `http://127.0.0.1:3081/...`), so no hardcoded host is needed. Only pin `oauth.publicOrigin` when a TLS reverse proxy's external name cannot be inferred from the request.
+
+### Authorization flow
+
+1. **Create the IdP app**: register a new OAuth app at GitHub / Google / Feishu / Casdoor, with the redirect URI above (the "Third-party login" settings page shows the copy-ready URI from the current domain + the proxy's real port).
+2. **Enable and configure the channel**: DSH settings → LAN Proxy → Third-party login, enter the `clientId` / `clientSecret` (official endpoints need only these two), and turn the channel on; for a self-hosted Casdoor also set `baseUrl` (or `authCenter.baseUrl`).
+3. **Bind before signing in**: under "Account bindings" click "Bind GitHub" (etc.) → a popup goes through `/oauth/<id>/bind/start` + `callback` and writes `(channel, stable subject)` into the binding table. An account that passes the IdP but is not bound is refused.
+4. **Sign in**: visit `http://<LAN-IP>:3081/`; the login page shows inline buttons only for enabled channels. Clicking one opens a popup to `/oauth/<id>/start` → IdP authorize → back to `callback`, which exchanges `code` for a token, reads the user info, checks the binding, and issues the same session cookie as a password login; the popup closes and the opener navigates to `/`.
+5. **Session management**: after sign-in, the settings page lists active sessions, and you can log out or revoke one; under `cleartextAuth: 'basic'` there is no session/logout concept.
+
 ## Settings page (port / credentials / start-stop)
 
 After restarting `dsh web`, open DSH settings (gear icon) → "LAN Proxy":
